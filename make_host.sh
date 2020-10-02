@@ -60,11 +60,11 @@ END
 configure() {
   yes "$FLAGS_root_password" | sudo chroot "$mnt_dir" passwd
   sudo sh -c "echo $FLAGS_name >| $mnt_dir/etc/hostname"
-  sudo sh -c "cat > $mnt_dir/etc/fstab" <<'END'
+  sudo sh -c "cat >| $mnt_dir/etc/fstab" <<'END'
 # <file system>        <dir>         <type>    <options>             <dump> <pass>
 /dev/sda1              /             ext4      defaults              1      1
 END
-  sudo sh -c "cat >> $mnt_dir/root/.bashrc" <<'END'
+  sudo sh -c "cat >| $mnt_dir/root/.bashrc" <<'END'
 res() {
   old=$(stty -g)
   stty raw -echo min 0 time 5
@@ -76,6 +76,15 @@ res() {
   stty cols "$cols" rows "$rows"
 }
 [ $(tty) = /dev/ttyS0 ] && res
+
+export EDITOR=vi
+export TERM=screen-256color
+export LS_OPTIONS='--color=auto -F'
+eval "`dircolors`"
+alias ls='ls $LS_OPTIONS'
+alias ll='ls $LS_OPTIONS -l'
+alias l='ls $LS_OPTIONS -lA'
+alias ip='ip -c'
 END
 }
 
