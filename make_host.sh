@@ -57,5 +57,4 @@ losetup -j "$root_image" -l --raw -n -O name | xargs sudo losetup -d
 # TODO: Internet
 # TODO: Local ethernet
 # TODO: Connecting with gdb to the kernel
-# TODO: ctrl+a doesn't work in the shell
 # TODO: terminal size is small
