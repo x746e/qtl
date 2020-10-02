@@ -38,13 +38,11 @@ vmlinuz="$(ls "$mnt_dir"/boot/vmlinuz*)"
 vmlinuz="${vmlinuz#*/}"
 initrd="$(ls "$mnt_dir"/boot/initrd*)"
 initrd="${initrd#*/}"
-grub_cfg="$(cat <<END
+sudo sh -c "cat > $mnt_dir/boot/grub/grub.cfg" <<END
 linux (hd0,msdos1)/$vmlinuz root=/dev/sda1 console=ttyS0 nokaslr
 initrd (hd0,msdos1)/$initrd
 boot
 END
-)"
-echo "$grub_cfg" | sudo sh -c "cat > $mnt_dir/boot/grub/grub.cfg"
 
 sudo sh -c "echo $FLAGS_name >| $mnt_dir/etc/hostname"
 sudo sh -c "cat > $mnt_dir/etc/fstab" <<END
