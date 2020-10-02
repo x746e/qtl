@@ -14,42 +14,57 @@ set -o nounset
 root_image="$FLAGS_name.img"
 mnt_dir="${FLAGS_name}_mnt"
 
-## Prepare partitions on the image.
-# TODO: Use qemu-image?
-fallocate -l10G "$root_image"
-sector_size=512
-partition_start_sectors=2048
-partition_start_bytes="$(( $sector_size * $partition_start_sectors ))"
-echo "start=        $partition_start_sectors, size=    20969472, type=83" | sfdisk "$root_image"
-disk_loop="$(sudo losetup --show -f "$root_image")"
-partition_loop="$(sudo losetup --show -f "$root_image" -o "$partition_start_bytes")"
-sudo mkfs -t ext4 "$partition_loop"
-mkdir -p "$mnt_dir"
-sudo mount "$partition_loop" "$mnt_dir"
 
-## Install and configure the Linux distribution.
-cache_dir="$HOME/.debootstrap-cache"
-mkdir -p "$cache_dir"
-sudo debootstrap --cache-dir="$cache_dir" --include=linux-image-amd64,grub-pc "$FLAGS_linux_distribution" "$mnt_dir"
-yes "$FLAGS_root_password" | sudo chroot "$mnt_dir" passwd
+# Creates, partitions, formats, and mounts the image
+prepare_image() {
+  # TODO: Use qemu-image?
+  fallocate -l10G "$root_image"
+  sector_size=512
+  partition_start_sectors=2048
+  partition_start_bytes="$(( $sector_size * $partition_start_sectors ))"
+  # TODO: Calculate the image size.
+  echo "start=        $partition_start_sectors, size=    20969472, type=83" | sfdisk "$root_image"
+  disk_loop="$(sudo losetup --show -f "$root_image")"
+  partition_loop="$(sudo losetup --show -f "$root_image" -o "$partition_start_bytes")"
+  sudo mkfs -t ext4 "$partition_loop"
+  mkdir -p "$mnt_dir"
+  sudo mount "$partition_loop" "$mnt_dir"
+}
 
-sudo grub-install --modules part_msdos --directory "$mnt_dir/usr/lib/grub/i386-pc" --boot-directory "$mnt_dir/boot" "$disk_loop"
-vmlinuz="$(ls "$mnt_dir"/boot/vmlinuz*)"
-vmlinuz="${vmlinuz#*/}"
-initrd="$(ls "$mnt_dir"/boot/initrd*)"
-initrd="${initrd#*/}"
-sudo sh -c "cat > $mnt_dir/boot/grub/grub.cfg" <<END
+
+# Install the Linux distribution, configure GRUB to boot it.
+install() {
+  cache_dir="$HOME/.debootstrap-cache"
+  mkdir -p "$cache_dir"
+  sudo debootstrap --cache-dir="$cache_dir" \
+    --include=linux-image-amd64,grub-pc \
+    "$FLAGS_linux_distribution" "$mnt_dir"
+
+  sudo grub-install \
+    --modules part_msdos \
+    --directory "$mnt_dir/usr/lib/grub/i386-pc" \
+    --boot-directory "$mnt_dir/boot" \
+    "$disk_loop"
+  vmlinuz="$(ls "$mnt_dir"/boot/vmlinuz*)"
+  vmlinuz="${vmlinuz#*/}"
+  initrd="$(ls "$mnt_dir"/boot/initrd*)"
+  initrd="${initrd#*/}"
+  sudo sh -c "cat > $mnt_dir/boot/grub/grub.cfg" <<END
 linux (hd0,msdos1)/$vmlinuz root=/dev/sda1 console=ttyS0 nokaslr
 initrd (hd0,msdos1)/$initrd
 boot
 END
+}
 
-sudo sh -c "echo $FLAGS_name >| $mnt_dir/etc/hostname"
-sudo sh -c "cat > $mnt_dir/etc/fstab" <<'END'
+
+configure() {
+  yes "$FLAGS_root_password" | sudo chroot "$mnt_dir" passwd
+  sudo sh -c "echo $FLAGS_name >| $mnt_dir/etc/hostname"
+  sudo sh -c "cat > $mnt_dir/etc/fstab" <<'END'
 # <file system>        <dir>         <type>    <options>             <dump> <pass>
 /dev/sda1              /             ext4      defaults              1      1
 END
-sudo sh -c "cat >> $mnt_dir/root/.bashrc" <<'END'
+  sudo sh -c "cat >> $mnt_dir/root/.bashrc" <<'END'
 res() {
   old=$(stty -g)
   stty raw -echo min 0 time 5
@@ -62,10 +77,20 @@ res() {
 }
 [ $(tty) = /dev/ttyS0 ] && res
 END
+}
 
-## Cleanup
-sudo umount "$mnt_dir"
-losetup -j "$root_image" -l --raw -n -O name | xargs sudo losetup -d
+
+cleanup() {
+  sudo umount "$mnt_dir"
+  losetup -j "$root_image" -l --raw -n -O name | xargs sudo losetup -d
+}
+
+
+prepare_image
+install
+configure
+cleanup
+
 
 # TODO: Internet
 # TODO: Local ethernet
