@@ -59,12 +59,21 @@ END
 
 configure() {
   yes "$FLAGS_root_password" | sudo chroot "$mnt_dir" passwd
-  sudo sh -c "echo $FLAGS_name >| $mnt_dir/etc/hostname"
+
   sudo sh -c "cat >| $mnt_dir/etc/fstab" <<'END'
 # <file system>        <dir>         <type>    <options>             <dump> <pass>
 /dev/sda1              /             ext4      defaults              1      1
 END
+
+  sudo sh -c "echo $FLAGS_name >| $mnt_dir/etc/hostname"
+  sudo sh -c "cat >| $mnt_dir/etc/network/interfaces" <<'END'
+source-directory /etc/network/interfaces.d
+auto ens3
+iface ens3 inet dhcp
+END
+
   sudo sh -c "cat >| $mnt_dir/root/.bashrc" <<'END'
+# https://unix.stackexchange.com/questions/16578/resizable-serial-console-window/283206#283206
 res() {
   old=$(stty -g)
   stty raw -echo min 0 time 5
@@ -101,7 +110,6 @@ configure
 cleanup
 
 
-# TODO: Internet
 # TODO: Local ethernet
 # TODO: Connecting with gdb to the kernel
 # TODO: man pages
