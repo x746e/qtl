@@ -6,6 +6,8 @@ DEFINE_file --required image '' 'Host image to start.'
 
 gbash::init_google "$@"
 
+# TODO: Set tmux window name
+
 sudo qemu-system-x86_64 \
   -drive file=$FLAGS_image,index=0,format=raw \
   -serial mon:stdio \

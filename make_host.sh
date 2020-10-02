@@ -38,21 +38,24 @@ vmlinuz="$(ls "$mnt_dir"/boot/vmlinuz*)"
 vmlinuz="${vmlinuz#*/}"
 initrd="$(ls "$mnt_dir"/boot/initrd*)"
 initrd="${initrd#*/}"
-grub_cfg=$(cat <<END
+grub_cfg="$(cat <<END
 linux (hd0,msdos1)/$vmlinuz root=/dev/sda1 console=ttyS0 nokaslr
 initrd (hd0,msdos1)/$initrd
 boot
 END
-)
+)"
 echo "$grub_cfg" | sudo sh -c "cat > $mnt_dir/boot/grub/grub.cfg"
 
 sudo sh -c "echo $FLAGS_name >| $mnt_dir/etc/hostname"
+sudo sh -c "cat > $mnt_dir/etc/fstab" <<END
+# <file system>        <dir>         <type>    <options>             <dump> <pass>
+/dev/sda1              /             ext4      defaults              1      1
+END
 
 ## Cleanup
 sudo umount "$mnt_dir"
 losetup -j "$root_image" -l --raw -n -O name | xargs sudo losetup -d
 
-# TODO: Mount / rw
 # TODO: Internet
 # TODO: Local ethernet
 # TODO: Connecting with gdb to the kernel
