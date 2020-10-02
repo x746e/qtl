@@ -45,9 +45,22 @@ boot
 END
 
 sudo sh -c "echo $FLAGS_name >| $mnt_dir/etc/hostname"
-sudo sh -c "cat > $mnt_dir/etc/fstab" <<END
+sudo sh -c "cat > $mnt_dir/etc/fstab" <<'END'
 # <file system>        <dir>         <type>    <options>             <dump> <pass>
 /dev/sda1              /             ext4      defaults              1      1
+END
+sudo sh -c "cat >> $mnt_dir/root/.bashrc" <<'END'
+res() {
+  old=$(stty -g)
+  stty raw -echo min 0 time 5
+  printf '\0337\033[r\033[999;999H\033[6n\0338' > /dev/tty
+  IFS='[;R' read -r _ rows cols _ < /dev/tty
+  stty "$old"
+  # echo "cols:$cols"
+  # echo "rows:$rows"
+  stty cols "$cols" rows "$rows"
+}
+[ $(tty) = /dev/ttyS0 ] && res
 END
 
 ## Cleanup
@@ -57,4 +70,6 @@ losetup -j "$root_image" -l --raw -n -O name | xargs sudo losetup -d
 # TODO: Internet
 # TODO: Local ethernet
 # TODO: Connecting with gdb to the kernel
-# TODO: terminal size is small
+# TODO: man pages
+# TODO: make grub use serial console
+# TODO: install zsh and my dotfiles
