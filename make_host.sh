@@ -42,13 +42,18 @@ prepare_image() {
   sudo mount "$partition_loop" "$mnt_dir"
 }
 
+extra_packages=(
+  tcpdump
+  python3-scapy
+  net-tools
+)
 
 # Install the Linux distribution, configure GRUB to boot it.
 install() {
   cache_dir="$HOME/.debootstrap-cache"
   mkdir -p "$cache_dir"
   sudo debootstrap --cache-dir="$cache_dir" \
-    --include=linux-image-amd64,grub-pc,tcpdump \
+    --include=linux-image-amd64,grub-pc,"$(printf '%s,' "${extra_packages[@]}")" \
     "$FLAGS_linux_distribution" "$mnt_dir"
 
   sudo grub-install \

@@ -18,4 +18,5 @@ sudo qemu-system-x86_64 \
   --enable-kvm \
   -cpu host
 
+# TODO: Allow adding/overriding the options.
 # TODO: Option to start with debug kernel.
