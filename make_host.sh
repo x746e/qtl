@@ -23,11 +23,13 @@ _generate_mac() {
   echo "52:54:00:$(printf "%02d" "$machine_number"):00:$(printf "%02d" "$nic_number")"
 }
 
-root_image="$FLAGS_name.img"
-mnt_dir="${FLAGS_name}_mnt"
+image_dir="$FLAGS_name"
+root_image="$image_dir/root.img"
+mnt_dir="$image_dir/mnt"
 
 # Creates, partitions, formats, and mounts the image
 prepare_image() {
+  mkdir -p "$image_dir"
   # TODO: Use qemu-image?
   fallocate -l10G "$root_image"
   sector_size=512
@@ -63,9 +65,9 @@ install() {
     --boot-directory "$mnt_dir/boot" \
     "$disk_loop"
   vmlinuz="$(ls "$mnt_dir"/boot/vmlinuz*)"
-  vmlinuz="${vmlinuz#*/}"
+  vmlinuz="${vmlinuz#$mnt_dir/}"
   initrd="$(ls "$mnt_dir"/boot/initrd*)"
-  initrd="${initrd#*/}"
+  initrd="${initrd#$mnt_dir/}"
   sudo sh -c "cat > $mnt_dir/boot/grub/grub.cfg" <<END
 linux (hd0,msdos1)/$vmlinuz root=/dev/sda1 console=ttyS0 nokaslr
 initrd (hd0,msdos1)/$initrd
