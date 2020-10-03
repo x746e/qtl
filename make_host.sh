@@ -46,6 +46,7 @@ extra_packages=(
   tcpdump
   python3-scapy
   net-tools
+  man-db
 )
 
 # Install the Linux distribution, configure GRUB to boot it.
@@ -134,6 +135,5 @@ cleanup
 
 
 # TODO: Connecting with gdb to the kernel
-# TODO: man pages
 # TODO: make grub use serial console
 # TODO: install zsh and my dotfiles
