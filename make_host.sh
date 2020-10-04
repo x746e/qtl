@@ -5,6 +5,7 @@ source gbash.sh || exit
 DEFINE_string linux_distribution 'sid' 'Debian/Ubuntu version to install with debootstrap.'
 DEFINE_string --required name '' 'Name of the host. Should be of form `\w+\d+`. \d+ part used for MAC address generation.'
 DEFINE_string root_password 'root' 'Root password to set.'
+DEFINE_bool get_debug_kernel_from_distribution true 'Whether to download debug kernel symbols and source for the linux-image... from the Debian/Ubuntu.'
 
 gbash::init_google "$@"
 
@@ -23,7 +24,7 @@ _generate_mac() {
   echo "52:54:00:$(printf "%02d" "$machine_number"):00:$(printf "%02d" "$nic_number")"
 }
 
-image_dir="$FLAGS_name"
+image_dir="$PWD/$FLAGS_name"
 root_image="$image_dir/root.img"
 mnt_dir="$image_dir/mnt"
 
@@ -44,19 +45,31 @@ prepare_image() {
   sudo mount "$partition_loop" "$mnt_dir"
 }
 
-extra_packages=(
+packages=(
+  # Required.  The image won't boot without these.
+  linux-image-amd64
+  grub-pc
+  # Extra packages.  Not required for operation, but quite useful.
   tcpdump
   python3-scapy
   net-tools
   man-db
 )
 
+if (( FLAGS_get_debug_kernel_from_distribution )); then
+  packages+=(
+    # Packages needed to get debug kernel symbols and source.
+    linux-image-amd64-dbg
+    dpkg-dev
+  )
+fi
+
 # Install the Linux distribution, configure GRUB to boot it.
 install() {
   cache_dir="$HOME/.debootstrap-cache"
   mkdir -p "$cache_dir"
   sudo debootstrap --cache-dir="$cache_dir" \
-    --include=linux-image-amd64,grub-pc,"$(printf '%s,' "${extra_packages[@]}")" \
+    --include="$(printf '%s,' "${packages[@]}")" \
     "$FLAGS_linux_distribution" "$mnt_dir"
 
   sudo grub-install \
@@ -121,8 +134,29 @@ alias ll='ls $LS_OPTIONS -l'
 alias l='ls $LS_OPTIONS -lA'
 alias ip='ip -c'
 END
+
+  if (( FLAGS_get_debug_kernel_from_distribution )); then
+    debug_dir="$image_dir/pkg-debug-kernel"
+    mkdir -p "$debug_dir"
+    # Get kernel symbols.
+    cp "$mnt_dir"/usr/lib/debug/boot/vmlinux-* "$debug_dir"
+    ln -s "$debug_dir"/vmlinux-* "$debug_dir/vmlinux"
+    # Get kernel source.
+    dbg_kernel_package="$(sudo chroot "$mnt_dir" dpkg -l | grep linux-image | grep dbg | grep -v meta-package | awk '{print $2}')"
+    if [[ "$(sudo chroot "$mnt_dir" wc -l /etc/apt/sources.list | awk '{print $1}')" != 1 ]]; then
+      die "Too many sources in virtual hosts's /etc/apt/sources.list"
+    fi
+    run_in_chroot "cat /etc/apt/sources.list | sed -e 's/^deb/deb-src/' >> /etc/apt/sources.list"
+    run_in_chroot apt update
+    run_in_chroot "mkdir /tmp/kernel_source && cd /tmp/kernel_source && apt source $dbg_kernel_package"
+    cp -r "$mnt_dir"/tmp/kernel_source/linux-* "$debug_dir"
+    ln -s "$debug_dir"/linux-* "$debug_dir/linux-src"
+  fi
 }
 
+run_in_chroot() {
+  sudo chroot "$mnt_dir" sh -c "$*"
+}
 
 cleanup() {
   sudo umount "$mnt_dir"
