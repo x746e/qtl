@@ -5,12 +5,13 @@ source gbash.sh || exit
 DEFINE_string linux_distribution 'sid' 'Debian/Ubuntu version to install with debootstrap.'
 DEFINE_string --required name '' 'Name of the host. Should be of form `\w+\d+`. \d+ part used for MAC address generation.'
 DEFINE_string root_password 'root' 'Root password to set.'
-DEFINE_bool get_debug_kernel_from_distribution true 'Whether to download debug kernel symbols and source for the linux-image... from the Debian/Ubuntu.'
 
 gbash::init_google "$@"
 
 set -o errexit
 set -o nounset
+
+sudo true
 
 die() { echo "$*" 1>&2 ; exit 1; }
 
@@ -46,32 +47,40 @@ prepare_image() {
 }
 
 packages=(
-  # Required.  The image won't boot without these.
-  linux-image-amd64
   grub-pc
-  # Extra packages.  Not required for operation, but quite useful.
+  linux-base
+  initramfs-tools
+  bash-completion
   tcpdump
   python3-scapy
   net-tools
   man-db
 )
 
-if (( FLAGS_get_debug_kernel_from_distribution )); then
-  packages+=(
-    # Packages needed to get debug kernel symbols and source.
-    linux-image-amd64-dbg
-    dpkg-dev
-  )
-fi
-
 # Install the Linux distribution, configure GRUB to boot it.
 install() {
+  _debootstrap
+  _install_kernel
+  _install_grub
+}
+
+_debootstrap() {
   cache_dir="$HOME/.debootstrap-cache"
   mkdir -p "$cache_dir"
   sudo debootstrap --cache-dir="$cache_dir" \
     --include="$(printf '%s,' "${packages[@]}")" \
     "$FLAGS_linux_distribution" "$mnt_dir"
+}
 
+_install_kernel() {
+  kernel_deb="$(ls kernels | grep 'linux-image.*deb$' | grep -v dbg)"
+  kernel_deb_path="kernels/$kernel_deb"
+  sudo cp "$kernel_deb_path" "$mnt_dir"
+  run_in_chroot "dpkg --install $kernel_deb"
+}
+
+_install_grub() {
+  disk_loop="$(sudo losetup --show -f "$root_image")"
   sudo grub-install \
     --modules part_msdos \
     --directory "$mnt_dir/usr/lib/grub/i386-pc" \
@@ -101,11 +110,11 @@ END
   sudo sh -c "cat >| $mnt_dir/etc/network/interfaces" <<END
 source-directory /etc/network/interfaces.d
 
-auto ens3
-iface ens3 inet dhcp
+auto enp0s3
+iface enp0s3 inet dhcp
 
-auto ens4
-iface ens4 inet static
+auto enp0s4
+iface enp0s4 inet static
   address 192.168.1.$machine_number
   netmask 255.255.255.0
   hwaddress ether $(_generate_mac 2)
@@ -134,24 +143,6 @@ alias ll='ls $LS_OPTIONS -l'
 alias l='ls $LS_OPTIONS -lA'
 alias ip='ip -c'
 END
-
-  if (( FLAGS_get_debug_kernel_from_distribution )); then
-    debug_dir="$image_dir/pkg-debug-kernel"
-    mkdir -p "$debug_dir"
-    # Get kernel symbols.
-    cp "$mnt_dir"/usr/lib/debug/boot/vmlinux-* "$debug_dir"
-    ln -s "$debug_dir"/vmlinux-* "$debug_dir/vmlinux"
-    # Get kernel source.
-    dbg_kernel_package="$(sudo chroot "$mnt_dir" dpkg -l | grep linux-image | grep dbg | grep -v meta-package | awk '{print $2}')"
-    if [[ "$(sudo chroot "$mnt_dir" wc -l /etc/apt/sources.list | awk '{print $1}')" != 1 ]]; then
-      die "Too many sources in virtual hosts's /etc/apt/sources.list"
-    fi
-    run_in_chroot "cat /etc/apt/sources.list | sed -e 's/^deb/deb-src/' >> /etc/apt/sources.list"
-    run_in_chroot apt update
-    run_in_chroot "mkdir /tmp/kernel_source && cd /tmp/kernel_source && apt source $dbg_kernel_package"
-    cp -r "$mnt_dir"/tmp/kernel_source/linux-* "$debug_dir"
-    ln -s "$debug_dir"/linux-* "$debug_dir/linux-src"
-  fi
 }
 
 run_in_chroot() {
@@ -170,6 +161,5 @@ configure
 cleanup
 
 
-# TODO: Connecting with gdb to the kernel
 # TODO: make grub use serial console
 # TODO: install zsh and my dotfiles

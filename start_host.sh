@@ -24,14 +24,11 @@ opts=(
 
 if (( FLAGS_debug )); then
   opts+=(-s)
+  # Make sure we are able to start qemu with sudo, before starting gdb.
+  sudo true
+  tmux new-window -a -d -n "gdb $FLAGS_name" "cd kernels/linux; gdb vmlinux -ex 'target remote localhost:1234' -ex continue"
 fi
-
-# Make sure we are able to start qemu with sudo, before starting gdb.
-sudo true
-
-tmux new-window -a -d -n "gdb $FLAGS_name" gdb "$PWD/$FLAGS_name/pkg-debug-kernel/vmlinux" -ex "dir $PWD/$FLAGS_name/pkg-debug-kernel/linux-src/" -ex 'target remote localhost:1234' -ex continue
 
 sudo qemu-system-x86_64 "${opts[@]}"
 
 # TODO: Allow adding/overriding the options.
-# TODO: Option to start with debug kernel.
