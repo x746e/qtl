@@ -7,7 +7,7 @@ DEFINE_bool debug false 'Attach to the kernel with GDB.'
 
 gbash::init_google "$@"
 
-# TODO: Set tmux window name
+tmux rename-window $FLAGS_name
 
 root_image="$FLAGS_name/root.img"
 
