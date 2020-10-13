@@ -74,10 +74,8 @@ _debootstrap() {
 }
 
 _install_kernel() {
-  kernel_deb="$(ls kernels | grep 'linux-image.*deb$' | grep -v dbg)"
-  kernel_deb_path="kernels/$kernel_deb"
-  sudo cp "$kernel_deb_path" "$mnt_dir"
-  run_in_chroot "dpkg --install $kernel_deb"
+  sudo make -C kernels/linux INSTALL_PATH="$mnt_dir/boot" install
+  run_in_chroot 'update-initramfs -c -k all'
 }
 
 _install_grub() {
