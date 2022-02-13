@@ -28,7 +28,8 @@ if (( FLAGS_debug )); then
   opts+=(-s)
   # Make sure we are able to start qemu with sudo, before starting gdb.
   sudo true
-  tmux new-window -a -d -n "gdb $FLAGS_name" "cd kernels/linux; gdb vmlinux -ex 'target remote localhost:1234' -ex continue"
+  gdb="$HOME/src/binutils-gdb/build/gdb/gdb --data-directory=$HOME/src/binutils-gdb/build/gdb/data-directory"
+  tmux new-window -a -d -n "gdb $FLAGS_name" "cd kernels/linux; $gdb vmlinux -ex 'target remote localhost:1234' -ex continue"
 fi
 
 if (( FLAGS_net_dump )); then
