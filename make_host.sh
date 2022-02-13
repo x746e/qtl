@@ -55,7 +55,7 @@ packages=(
   python3-scapy
   net-tools
   man-db
-  netcat
+  netcat-openbsd
 )
 
 # Install the Linux distribution, configure GRUB to boot it.
